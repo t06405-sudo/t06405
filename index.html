@@ -1,0 +1,1390 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>小小遊戲設計師：程式勇者的 Scratch 接星大冒險 RPG</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: 復古像素與現代繁中 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Noto+Sans+TC:wght@400;600;800;900&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: 'Noto Sans TC', sans-serif;
+    }
+    .pixel-font {
+      font-family: 'Press Start 2P', monospace;
+    }
+    /* 像素邊框與陰影 */
+    .pixel-box {
+      border: 4px solid #1e293b;
+      box-shadow: 4px 4px 0px #0f172a;
+    }
+    .pixel-card {
+      transition: all 0.15s ease-in-out;
+      border: 3px solid #334155;
+      box-shadow: 3px 3px 0px #1e293b;
+    }
+    .pixel-card:hover:not(:disabled) {
+      transform: translate(-2px, -2px);
+      box-shadow: 5px 5px 0px #0ea5e9;
+    }
+    .pixel-btn {
+      transition: all 0.1s ease;
+      box-shadow: 0 4px 0 #0f172a;
+    }
+    .pixel-btn:active:not(:disabled) {
+      transform: translateY(3px);
+      box-shadow: 0 1px 0 #0f172a;
+    }
+    /* 螢幕震動動畫 */
+    @keyframes screenShake {
+      0%, 100% { transform: translate(0, 0); }
+      20% { transform: translate(-8px, 6px); }
+      40% { transform: translate(8px, -6px); }
+      60% { transform: translate(-6px, -4px); }
+      80% { transform: translate(6px, 4px); }
+    }
+    .shake {
+      animation: screenShake 0.35s ease;
+    }
+    /* 浮動傷害數字 */
+    @keyframes floatUp {
+      0% { opacity: 1; transform: translateY(0) scale(1); }
+      50% { transform: translateY(-25px) scale(1.3); }
+      100% { opacity: 0; transform: translateY(-50px) scale(0.9); }
+    }
+    .floating-text {
+      animation: floatUp 0.85s forwards ease-out;
+    }
+    /* 自訂捲軸 */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col justify-between selection:bg-amber-400 selection:text-slate-900">
+
+  <!-- ==================== 頂部 HUD 狀態列 ==================== -->
+  <header class="bg-slate-900/90 backdrop-blur border-b-4 border-slate-800 px-4 py-2 sticky top-0 z-40">
+    <div class="max-w-6xl mx-auto flex flex-wrap items-center justify-between gap-3">
+      <!-- 標題與關卡資訊 -->
+      <div class="flex items-center gap-3">
+        <div class="bg-amber-500 text-slate-950 px-2.5 py-1 rounded font-black text-xs tracking-wider flex items-center gap-1 pixel-font">
+          <span>G5</span> <span>SCRATCH</span>
+        </div>
+        <div>
+          <h1 class="font-extrabold text-sm md:text-base text-amber-300 flex items-center gap-2">
+            <span>程式勇者：接星大冒險</span>
+            <span id="stage-badge" class="bg-sky-900/80 text-sky-200 text-xs px-2 py-0.5 rounded border border-sky-600">第 1 / 5 關</span>
+          </h1>
+          <p id="stage-subheading" class="text-xs text-slate-400">巡邏史萊姆的考驗：迴圈與持續移動</p>
+        </div>
+      </div>
+
+      <!-- 勇者與魔物血條 / 連擊數 -->
+      <div class="flex items-center gap-4 flex-1 max-w-md justify-end">
+        <!-- 玩家 HP -->
+        <div class="w-28 md:w-36">
+          <div class="flex justify-between text-xs mb-1 font-bold">
+            <span class="text-emerald-400 flex items-center gap-1">🛡️ 勇者 HP</span>
+            <span id="player-hp-text" class="pixel-font text-[10px]">100/100</span>
+          </div>
+          <div class="w-full bg-slate-800 rounded-full h-3 border border-slate-700 overflow-hidden p-0.5">
+            <div id="player-hp-bar" class="bg-emerald-500 h-full rounded-full transition-all duration-300" style="width: 100%;"></div>
+          </div>
+        </div>
+
+        <!-- 連擊 Combo -->
+        <div class="bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-700 text-center min-w-[60px]">
+          <div class="text-[10px] text-slate-400 font-bold">COMBO</div>
+          <div id="combo-count" class="pixel-font text-amber-400 text-xs font-black">0x</div>
+        </div>
+
+        <!-- 工具按鈕：音效與 AI 設定 -->
+        <div class="flex items-center gap-1.5">
+          <button id="btn-sound-toggle" title="切換音效" class="p-2 bg-slate-800 hover:bg-slate-700 rounded border border-slate-600 text-sm">
+            🔊
+          </button>
+          <button id="btn-api-modal" title="設定 Gemini API Key" class="p-2 bg-slate-800 hover:bg-slate-700 rounded border border-slate-600 text-sm">
+            ⚙️
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- 課文情境廣播滾動條 -->
+  <div class="bg-slate-900 border-b border-slate-800 text-xs py-1.5 px-4 overflow-hidden relative">
+    <div class="flex items-center gap-2 max-w-6xl mx-auto">
+      <span class="bg-indigo-600 text-indigo-100 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase">Tips</span>
+      <div id="ticker-text" class="text-slate-300 truncate transition-all duration-500">
+        📌 任務目標：完成「接星星」遊戲！玩家控制移動、碰撞偵測得分、分身掉落製造多顆星星！
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 戰鬥主舞台 ==================== -->
+  <main class="max-w-6xl w-full mx-auto p-3 md:p-4 flex-1 flex flex-col gap-4">
+
+    <!-- 舞台展示區 (背景 + NPC + 怪物 + 勇者 + 浮動傷害) -->
+    <div id="battle-stage" class="relative rounded-2xl overflow-hidden pixel-box border-4 border-slate-800 bg-slate-900 shadow-2xl min-h-[220px] md:min-h-[280px] flex items-end justify-between p-4 md:p-8">
+      
+      <!-- 背景圖片與 Fallback -->
+      <img id="stage-bg-img" 
+           src="https://image.pollinations.ai/prompt/pixel%20art%20retro%20arcade%20video%20game%20cyber%20classroom%20neon%20stars%20dungeon?width=1024&height=600&nologo=true" 
+           alt="戰鬥背景" 
+           class="absolute inset-0 w-full h-full object-cover opacity-35 pointer-events-none transition-all duration-700"
+           onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'1024\' height=\'600\'><rect width=\'100%\' height=\'100%\' fill=\'%23090d16\'/><circle cx=\'200\' cy=\'150\' r=\'120\' fill=\'%231e293b\' opacity=\'0.5\'/><circle cx=\'800\' cy=\'350\' r=\'180\' fill=\'%230f172a\' opacity=\'0.8\'/></svg>';">
+      <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent pointer-events-none"></div>
+
+      <!-- 浮動文字容器 -->
+      <div id="floating-container" class="absolute inset-0 pointer-events-none flex items-center justify-center z-30"></div>
+
+      <!-- 勇者側（左） -->
+      <div class="relative z-10 flex flex-col items-center">
+        <!-- 勇者對話氣泡 -->
+        <div id="player-bubble" class="hidden mb-2 bg-slate-900 border-2 border-emerald-500 text-emerald-200 text-xs px-3 py-1.5 rounded-xl shadow-lg max-w-[200px] text-center font-bold">
+          積木拼圖完成！發動攻擊！
+        </div>
+        <div class="relative group">
+          <img id="player-avatar" 
+               src="https://api.dicebear.com/9.x/pixel-art/svg?seed=CodeHeroAllen&backgroundColor=0ea5e9" 
+               alt="勇者" 
+               class="w-20 h-20 md:w-28 md:h-28 rounded-xl border-2 border-sky-400 bg-sky-950/80 shadow-md transform transition group-hover:scale-105"
+               onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'100\' height=\'100\'><rect width=\'100%\' height=\'100%\' fill=\'%230284c7\'/><text x=\'50\' y=\'60\' font-size=\'40\' text-anchor=\'middle\' fill=\'white\'>🧙‍♂️</text></svg>';">
+          <div class="absolute -bottom-2 bg-sky-600 text-[10px] font-black px-2 py-0.5 rounded-full text-white uppercase shadow">
+            設計師勇者
+          </div>
+        </div>
+      </div>
+
+      <!-- 關卡中央對戰標誌 / 題目情境廣播 -->
+      <div class="relative z-10 hidden sm:flex flex-col items-center justify-center mb-6 px-4">
+        <div class="pixel-font text-xs text-amber-400 mb-1 flex items-center gap-1">
+          <span>⚔️</span> <span>VS</span> <span>🛡️</span>
+        </div>
+        <div class="bg-slate-900/90 border border-slate-700 px-3 py-1 rounded text-[11px] text-slate-300 font-medium max-w-xs text-center backdrop-blur">
+          運用運算思維積木，擊破程式迷思魔物！
+        </div>
+      </div>
+
+      <!-- 怪物/守門 Boss 側（右） -->
+      <div class="relative z-10 flex flex-col items-center">
+        <!-- 魔物血條 -->
+        <div class="w-24 md:w-32 mb-1.5">
+          <div class="flex justify-between text-[10px] text-rose-300 font-bold mb-0.5">
+            <span id="enemy-name">巡邏史萊姆</span>
+            <span id="enemy-hp-text" class="pixel-font text-[9px]">100%</span>
+          </div>
+          <div class="w-full bg-slate-800 rounded-full h-2 border border-slate-700 overflow-hidden">
+            <div id="enemy-hp-bar" class="bg-rose-500 h-full rounded-full transition-all duration-300" style="width: 100%;"></div>
+          </div>
+        </div>
+
+        <!-- 魔物嘲諷氣泡 -->
+        <div id="enemy-bubble" class="mb-2 bg-slate-900 border-2 border-rose-500 text-rose-200 text-xs px-3 py-1.5 rounded-xl shadow-lg max-w-[210px] text-center font-bold">
+          「沒有迴圈，你的角色動一步就卡死了啦！」
+        </div>
+
+        <div class="relative group">
+          <img id="enemy-avatar" 
+               src="https://api.dicebear.com/9.x/pixel-art/svg?seed=LoopSlime&backgroundColor=e11d48" 
+               alt="魔物" 
+               class="w-20 h-20 md:w-28 md:h-28 rounded-xl border-2 border-rose-500 bg-rose-950/80 shadow-md transform transition group-hover:scale-105"
+               onerror="this.onerror=null; this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'100\' height=\'100\'><rect width=\'100%\' height=\'100%\' fill=\'%23e11d48\'/><text x=\'50\' y=\'60\' font-size=\'40\' text-anchor=\'middle\' fill=\'white\'>👾</text></svg>';">
+          <div id="enemy-tag" class="absolute -bottom-2 bg-rose-600 text-[10px] font-black px-2 py-0.5 rounded-full text-white uppercase shadow">
+            Bug 魔物
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== 題目情境與挑戰卡牌區 ==================== -->
+    <div class="bg-slate-900 border-4 border-slate-800 rounded-2xl p-4 md:p-5 shadow-xl flex flex-col gap-4">
+      
+      <!-- 題幹與情境說明 -->
+      <div class="border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2 mb-1.5">
+          <span class="bg-amber-400 text-slate-950 font-black text-xs px-2 py-0.5 rounded pixel-font">STAGE CHALLENGE</span>
+          <span id="question-category" class="text-xs font-semibold text-sky-400 bg-sky-950 px-2 py-0.5 rounded border border-sky-800">
+            [控制積木 / 重複迴圈]
+          </span>
+          <span id="bloom-level" class="text-[11px] font-bold text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-800">
+            認知：分析與應用
+          </span>
+        </div>
+        <h2 id="question-text" class="text-base md:text-lg font-black text-white leading-relaxed">
+          巡邏史萊姆嘲笑你：「你的角色剛按綠旗就停住了，根本不會在螢幕上來回巡邏！」請問你該使用哪一組 Scratch 積木架構來達成正確的巡邏效果？
+        </h2>
+      </div>
+
+      <!-- 4 張思維積木卡牌選擇區 (1 正解 + 3 具教學價值的迷思誘答) -->
+      <div id="cards-container" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <!-- 動態渲染卡牌 -->
+      </div>
+
+      <!-- 底部鷹架求助欄 -->
+      <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/80">
+        <div class="flex items-center gap-2">
+          <button id="btn-open-scaffold" class="pixel-btn bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-3 py-2 rounded-lg flex items-center gap-1.5 border border-indigo-400">
+            <span>💡</span> <span>三階漸進鷹架抽屜</span>
+          </button>
+          <button id="btn-ask-gemini" class="pixel-btn bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold text-xs px-3 py-2 rounded-lg flex items-center gap-1.5 shadow">
+            <span>🤖</span> <span>蘇格拉底 AI 提點</span>
+          </button>
+        </div>
+        <div class="text-xs text-slate-400 flex items-center gap-2">
+          <span>答錯不扣血，提供漸進提示引導！</span>
+          <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ==================== 頁尾版權與規範 ==================== -->
+  <footer class="bg-slate-950 border-t border-slate-900 py-3 text-center text-xs text-slate-500">
+    臺灣 108 課綱資訊科技 Scratch 3.0 單元教材融入小遊戲 ｜ 依循 AI 倫理綠黃紅燈準則 ｜ 單一檔案純前端運行
+  </footer>
+
+  <!-- ==================== 彈出視窗：三階鷹架抽屜 (Modal) ==================== -->
+  <div id="scaffold-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border-4 border-indigo-600 rounded-2xl max-w-lg w-full p-5 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+        <div class="flex items-center gap-2">
+          <span class="text-2xl">💡</span>
+          <h3 class="font-extrabold text-base text-indigo-300">程式鷹架智慧解碼室</h3>
+        </div>
+        <button id="btn-close-scaffold" class="text-slate-400 hover:text-white text-lg font-bold p-1">✕</button>
+      </div>
+
+      <!-- 三階引導內容 -->
+      <div class="space-y-4">
+        <!-- Level 1: 課本與教案線索 -->
+        <div class="bg-slate-800/80 border-l-4 border-sky-400 p-3.5 rounded-r-xl">
+          <div class="flex items-center gap-1.5 text-xs font-black text-sky-300 mb-1">
+            <span>📖 Level 1：課文與教材線索</span>
+          </div>
+          <p id="scaffold-l1" class="text-xs text-slate-300 leading-relaxed">
+            巡邏需要讓程式「一直執行」而不是只跑一次。Scratch 的「重複執行」積木會把包在裡面的積木連續執行直到手動停止。
+          </p>
+        </div>
+
+        <!-- Level 2: 思維破迷詰問 -->
+        <div class="bg-slate-800/80 border-l-4 border-amber-400 p-3.5 rounded-r-xl">
+          <div class="flex items-center gap-1.5 text-xs font-black text-amber-300 mb-1">
+            <span>🔍 Level 2：除錯思維詰問</span>
+          </div>
+          <p id="scaffold-l2" class="text-xs text-slate-300 leading-relaxed">
+            如果移動 10 點積木放在「重複執行」外面，電腦會如何執行？只會讀取一次就結束！另外如果碰到邊緣沒有反彈，角色會發生什麼事？
+          </p>
+        </div>
+
+        <!-- Level 3: 蘇格拉底 AI 或名師精闢解析 -->
+        <div class="bg-slate-800/80 border-l-4 border-emerald-400 p-3.5 rounded-r-xl">
+          <div class="flex items-center gap-1.5 text-xs font-black text-emerald-300 mb-1">
+            <span>🧠 Level 3：名師核心關鍵思維</span>
+          </div>
+          <p id="scaffold-l3" class="text-xs text-slate-300 leading-relaxed">
+            【最佳實踐】：「當綠旗被點擊 ➔ 重複執行 ➔ 移動 10 點 ➔ 碰到邊緣就反彈」。這就是 Scratch 最經典的角色巡邏公式！
+          </p>
+        </div>
+      </div>
+
+      <div class="mt-5 pt-3 border-t border-slate-800 flex justify-end">
+        <button id="btn-ack-scaffold" class="pixel-btn bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs px-4 py-2 rounded-lg">
+          我明白了，返回戰鬥！
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 彈出視窗：Gemini API 提點對話盒 (Modal) ==================== -->
+  <div id="gemini-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border-4 border-purple-600 rounded-2xl max-w-lg w-full p-5 shadow-2xl relative">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+        <div class="flex items-center gap-2">
+          <span class="text-2xl">🤖</span>
+          <div>
+            <h3 class="font-extrabold text-base text-purple-300">蘇格拉底 AI 學習導師</h3>
+            <p class="text-[11px] text-slate-400">遵行教案黃燈規範：不直接給答案，以提問引導思考！</p>
+          </div>
+        </div>
+        <button id="btn-close-gemini" class="text-slate-400 hover:text-white text-lg font-bold p-1">✕</button>
+      </div>
+
+      <!-- AI 對話內容區 -->
+      <div id="gemini-response-box" class="bg-slate-950 p-4 rounded-xl border border-slate-800 min-h-[140px] max-h-[260px] overflow-y-auto text-xs text-slate-200 leading-relaxed flex flex-col justify-center">
+        <div class="text-slate-400 text-center italic">點擊下方按鈕，向 AI 導師尋求提問引導...</div>
+      </div>
+
+      <div class="mt-4 flex items-center justify-between gap-3">
+        <span class="text-[10px] text-slate-500">※ 若未設定 API Key，將自動使用內建蘇格拉底提示庫</span>
+        <button id="btn-request-gemini-ai" class="pixel-btn bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs px-4 py-2 rounded-lg flex items-center gap-1.5">
+          <span>✨</span> <span>召喚導師提問</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 彈出視窗：API Key 設定 (Modal) ==================== -->
+  <div id="settings-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border-4 border-slate-700 rounded-2xl max-w-md w-full p-5 shadow-2xl relative">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+        <h3 class="font-extrabold text-base text-amber-300 flex items-center gap-2">
+          <span>⚙️</span> <span>Gemini API Key 設定</span>
+        </h3>
+        <button id="btn-close-settings" class="text-slate-400 hover:text-white text-lg font-bold p-1">✕</button>
+      </div>
+
+      <div class="space-y-3 text-xs text-slate-300">
+        <p>若希望開啟真實的 Gemini 2.5 Flash 蘇格拉底即時提問，請輸入您的 Google Gemini API Key（儲存於您本地瀏覽器的 LocalStorage，不外洩）：</p>
+        <input id="input-api-key" type="password" placeholder="貼上 AI Studio API Key..." class="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-amber-400 font-mono">
+        <p class="text-[11px] text-slate-400">※ 若不填寫，系統將自動啟動內建名師反思鷹架，完全不影響遊戲流暢度。</p>
+      </div>
+
+      <div class="mt-5 flex justify-end gap-2">
+        <button id="btn-save-key" class="pixel-btn bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-4 py-2 rounded-lg">
+          儲存設定
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 彈出視窗：通關結算與學習評量儀表板 (Victory Modal) ==================== -->
+  <div id="victory-modal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-900 border-4 border-amber-400 rounded-2xl max-w-2xl w-full p-5 md:p-6 shadow-2xl relative max-h-[95vh] overflow-y-auto">
+      
+      <!-- 獎章與標題 -->
+      <div class="text-center mb-4">
+        <div class="text-4xl mb-1">🏆</div>
+        <h2 class="text-xl md:text-2xl font-black text-amber-400 pixel-font">MISSION COMPLETED!</h2>
+        <p class="text-xs text-slate-300 mt-1">恭喜程式勇者！你已成功駕馭迴圈、條件偵測與分身，完成接星星小遊戲！</p>
+      </div>
+
+      <!-- 五向度素養雷達圖與分析 -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-center bg-slate-950 p-4 rounded-xl border border-slate-800 mb-4">
+        <div class="flex flex-col items-center">
+          <canvas id="radar-canvas" width="260" height="260" class="max-w-full"></canvas>
+          <span class="text-[11px] text-slate-400 mt-1 font-bold">108 課綱五向度運算思維雷達圖</span>
+        </div>
+        <div class="space-y-2 text-xs">
+          <div class="bg-slate-900 p-2.5 rounded-lg border border-slate-800">
+            <div class="font-bold text-amber-300 mb-1 flex items-center gap-1">
+              <span>🌟</span> <span>通關總結評價</span>
+            </div>
+            <p id="eval-summary" class="text-slate-300 leading-relaxed text-[11px]">
+              你展現了優秀的演算法邏輯與除錯推理能力！特別在多重條件判斷與分身掉落回收上觀念極為清晰，完美避開了常見的重複爆分陷阱！
+            </p>
+          </div>
+          <div class="grid grid-cols-2 gap-2 text-center text-[11px]">
+            <div class="bg-slate-900 p-2 rounded border border-slate-800">
+              <div class="text-slate-400 font-bold">總通關時間</div>
+              <div id="stat-total-time" class="text-sky-400 font-extrabold pixel-font mt-0.5">01:45</div>
+            </div>
+            <div class="bg-slate-900 p-2 rounded border border-slate-800">
+              <div class="text-slate-400 font-bold">最高連擊 (Combo)</div>
+              <div id="stat-max-combo" class="text-emerald-400 font-extrabold pixel-font mt-0.5">5x</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 匯出與通報按鈕 -->
+      <div class="flex flex-wrap items-center justify-between gap-3 pt-2">
+        <div class="flex items-center gap-2">
+          <button id="btn-export-csv" class="pixel-btn bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-3.5 py-2 rounded-lg flex items-center gap-1.5 shadow">
+            <span>📥</span> <span>匯出學習歷程 CSV</span>
+          </button>
+          <button id="btn-copy-report" class="pixel-btn bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs px-3.5 py-2 rounded-lg flex items-center gap-1.5 shadow">
+            <span>📋</span> <span>複製通報簡報文字</span>
+          </button>
+        </div>
+        <button id="btn-restart-game" class="pixel-btn bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs px-4 py-2 rounded-lg">
+          🔄 重新挑戰
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast 提示組件 -->
+  <div id="toast" class="fixed bottom-6 right-6 bg-slate-900 border-2 border-amber-400 text-amber-200 px-4 py-2.5 rounded-xl text-xs font-bold shadow-2xl transform translate-y-24 opacity-0 transition-all duration-300 z-50 flex items-center gap-2">
+    <span id="toast-icon">✨</span>
+    <span id="toast-msg">提示訊息</span>
+  </div>
+
+  <!-- ==================== JavaScript 全集成控制器 ==================== -->
+  <script>
+    /* ========================================================
+       1. 原生 8-bit Web Audio 合成音效引擎
+       ======================================================== */
+    class RetroSoundEngine {
+      constructor() {
+        this.ctx = null;
+        this.muted = false;
+      }
+
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          if (AudioContext) {
+            this.ctx = new AudioContext();
+          }
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+
+      playClick() {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(440, now);
+        osc.frequency.exponentialRampToValueAtTime(880, now + 0.05);
+
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.05);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.05);
+      }
+
+      playSuccess() {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+        const notes = [261.63, 329.63, 392.00, 523.25]; // C4, E4, G4, C5 升階琶音
+        notes.forEach((freq, idx) => {
+          const now = this.ctx.currentTime + idx * 0.07;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, now);
+
+          gain.gain.setValueAtTime(0.2, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.18);
+        });
+      }
+
+      playHurt() {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(160, now);
+        osc.frequency.exponentialRampToValueAtTime(40, now + 0.28);
+
+        gain.gain.setValueAtTime(0.22, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.28);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.28);
+      }
+
+      playFanfare() {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+        const melody = [
+          { f: 392.00, d: 0.12 }, // G4
+          { f: 523.25, d: 0.12 }, // C5
+          { f: 659.25, d: 0.15 }, // E5
+          { f: 783.99, d: 0.35 }  // G5
+        ];
+        let t = this.ctx.currentTime;
+        melody.forEach(item => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(item.f, t);
+
+          gain.gain.setValueAtTime(0.18, t);
+          gain.gain.linearRampToValueAtTime(0.01, t + item.d);
+
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(t);
+          osc.stop(t + item.d);
+          t += item.d + 0.03;
+        });
+      }
+
+      toggleMute() {
+        this.muted = !this.muted;
+        return this.muted;
+      }
+    }
+
+    /* ========================================================
+       2. 五年級 Scratch 遊戲設計師 結構化題庫資料庫 (5 大關卡)
+       依據《五年級Scratch_範本格式_AI教學情境版.docx》核心教案精準對齊
+       ======================================================== */
+    const STAGES_DATA = [
+      {
+        id: 1,
+        title: "第 1 關：巡邏史萊姆的考驗",
+        subheading: "重複迴圈與角色持續自動移動",
+        category: "重複迴圈 / 動作控制",
+        bloom: "Bloom: 理解與應用",
+        enemyName: "巡邏史萊姆",
+        enemyTag: "巡邏迷思魔物",
+        enemySeed: "LoopSlime",
+        enemyColor: "059669",
+        enemyTaunt: "「沒有重複積木，你的角色動一步就卡死了啦！」",
+        bgPrompt: "pixel art retro arcade video game cyber dungeon green slime patrol",
+        ticker: "📌 第1節重點：巡邏角色必須使用「重複執行」讓積木持續生效，並搭配「碰到邊緣就反彈」！",
+        question: "小遊戲中的障礙物怪物需要在舞台上左右來回巡邏。有位同學寫了『當綠旗被點擊 ➔ 移動 10 點 ➔ 碰到邊緣就反彈』，點擊綠旗後角色只動了一點點就停下來了。請問應該如何修正才能讓怪物一直自動巡邏？",
+        scaffold: {
+          l1: "回憶課堂第一節：如果沒有重複積木，移動指令只會被電腦讀取並執行一次就宣告結束。",
+          l2: "思維破迷：如何讓電腦『一直不斷地』執行移動與反彈？該用哪一種外框積木把動作積木包起來？",
+          l3: "名師解法：將「移動 10 點」與「碰到邊緣就反彈」放進「重複執行」積木內部，才能形成永不中斷的巡邏機制！"
+        },
+        geminiPrompt: "我正在學習 Scratch 第1節巡邏角色的迴圈。我的角色只動了一次就停止。請用蘇格拉底反詰法問我三個問題，引導我思考電腦執行順序與重複積木的用途，不要直接告訴我答案。",
+        cards: [
+          {
+            id: "A",
+            isCorrect: true,
+            title: "奧義積木卡：無限巡邏迴圈",
+            desc: "將『移動 10 點』與『碰到邊緣就反彈』包進『重複執行』迴圈內",
+            misconceptionAnalysis: "正解！重複執行讓動作每訊框持續被呼叫，搭配邊緣反彈達成巡邏！"
+          },
+          {
+            id: "B",
+            isCorrect: false,
+            title: "迷思卡：複製十次積木",
+            desc: "直接在程式區連續串接 10 個『移動 10 點』積木",
+            misconceptionAnalysis: "學生常見迷思：以為多放幾個積木就能一直動，但執行完 10 次後角色依舊會停下來，浪費空間且不具彈性。"
+          },
+          {
+            id: "C",
+            isCorrect: false,
+            title: "迷思卡：等待直到點擊",
+            desc: "在移動 10 點後面加上『等待直到 按下空白鍵』積木",
+            misconceptionAnalysis: "觀念混淆：等待直到會讓程式暫停在此處，根本無法達成自動巡邏。"
+          },
+          {
+            id: "D",
+            isCorrect: false,
+            title: "迷思卡：迴圈外包錯層",
+            desc: "把『重複執行』放在程式最後面，但裡面什麼積木都不放",
+            misconceptionAnalysis: "結構錯誤：空的迴圈只會空轉，原本在迴圈外的移動指令仍然只執行一次。"
+          }
+        ]
+      },
+      {
+        id: 2,
+        title: "第 2 關：碰撞石像鬼的結界",
+        subheading: "控制判斷、偵測與判斷順序",
+        category: "偵測與如果判斷",
+        bloom: "Bloom: 分析與判斷",
+        enemyName: "碰撞石像鬼",
+        enemyTag: "條件偵測巨怪",
+        enemySeed: "DetectGargoyle",
+        enemyColor: "7c3aed",
+        enemyTaunt: "「你的『碰到玩家』根本沒包在迴圈裡，你碰得到我嗎？哈哈！」",
+        bgPrompt: "pixel art retro arcade video game cyber temple gargoyle stone gate neon stars",
+        ticker: "📌 第2節重點：條件判斷『如果...那麼』必須放在『重複執行』內，才能隨時隨地偵測碰撞！",
+        question: "在『接星星』遊戲中，小明設定了『當綠旗被點擊 ➔ 如果 碰到玩家角色 那麼 說出「得分！」』。可是遊戲開始後，玩家角色走過去碰到星星，星星卻完全沒有任何反應！請問根本原因是什麼？",
+        scaffold: {
+          l1: "觀察綠旗按下的一瞬間：電腦執行速度極快，在按下綠旗的千分之一秒內，這段如果條件就已經檢查完畢了！",
+          l2: "思維破迷：按下綠旗的當下，玩家的角色已經碰到星星了嗎？還沒！既然當下沒碰到，那後面還會再檢查嗎？",
+          l3: "名師解法：如果條件判斷只執行一次就結束了。必須用「重複執行」將如果積木包起來，讓電腦在整個遊戲過程中每分每秒都持續監測！"
+        },
+        geminiPrompt: "我正在寫 Scratch 接星星遊戲的碰撞偵測。我發現按綠旗後角色碰到星星沒反應。請以引導式提問引導我理解程式執行時間點與重複執行的關係。",
+        cards: [
+          {
+            id: "A",
+            isCorrect: false,
+            title: "迷思卡：更換角色顏色",
+            desc: "把玩家角色改成黃色，改用『碰到顏色？』積木偵測",
+            misconceptionAnalysis: "非關鍵誤區：問題在於檢查的時機點而非偵測模式，單次檢查換顏色一樣無效。"
+          },
+          {
+            id: "B",
+            isCorrect: true,
+            title: "奧義積木卡：常駐偵測防護罩",
+            desc: "用『重複執行』把『如果 碰到玩家角色 那麼...』整個包住持續監控",
+            misconceptionAnalysis: "正解！條件判斷必須在遊戲進行中被循環輪詢（polling），才能捕捉隨時發生的碰撞！"
+          },
+          {
+            id: "C",
+            isCorrect: false,
+            title: "迷思卡：增加等待時間",
+            desc: "在綠旗被點擊下方插入『等待 5 秒』再檢查條件",
+            misconceptionAnalysis: "時間盲區：等待 5 秒後依舊只瞬間檢查一次，只要那瞬間沒碰到依然判定失敗。"
+          },
+          {
+            id: "D",
+            isCorrect: false,
+            title: "迷思卡：把積木放進舞台",
+            desc: "把程式從星星身上剪下，貼到舞台背景的程式區",
+            misconceptionAnalysis: "權責混淆：舞台無法直接判斷星星是否碰到玩家，反而會引發角色找不到事件的混亂。"
+          }
+        ]
+      },
+      {
+        id: 3,
+        title: "第 3 關：暴食哥布林的計分貪食症",
+        subheading: "變數計分與避免連續重複加分 Bug",
+        category: "變數除錯 / 碰撞處理",
+        bloom: "Bloom: 評鑑與除錯",
+        enemyName: "暴食哥布林",
+        enemyTag: "連鎖爆分 Bug",
+        enemySeed: "ScoreGoblin",
+        enemyColor: "d97706",
+        enemyTaunt: "「碰到我一次，我就送你一萬分！你的計分器早就壞掉啦！」",
+        bgPrompt: "pixel art retro arcade video game cyber gold treasure vault goblin",
+        ticker: "📌 教案核心除錯題：碰到星星連續暴增幾十分？是因為碰撞期間電腦持續加分！必須加入隱藏或分身消除機制！",
+        question: "接物遊戲中，小華設計了『變數 分數改變 1』。但測試時發現：玩家碰到一顆星星，分數竟然像機關槍一樣一口氣暴增了 38 分！依據課堂教案的除錯指引，下列哪一種做法是解決此 Bug 最標準的運算思維？",
+        scaffold: {
+          l1: "注意電腦每秒運算 30 次以上：當角色碰到星星時，兩者接觸了約 0.5 秒，這段期間每訊框都符合『碰到』條件！",
+          l2: "思維破迷：既然接到星星了，這顆星星應該繼續留在原地嗎？或者該如何讓它『立即解除接觸狀態』？",
+          l3: "名師解法：加分後必須立刻『隱藏』該角色或將其移至隨機頂部（若是分身則執行『刪除此分身』），打斷碰撞判定！"
+        },
+        geminiPrompt: "我的 Scratch 遊戲發生了經典 Bug：碰到一次星星卻重複加了幾十分。請身為五年級老師，用三個問題引導我自己找出消除碰撞的方法，不要替我寫程式碼。",
+        cards: [
+          {
+            id: "A",
+            isCorrect: false,
+            title: "迷思卡：把分數改成加零",
+            desc: "將『變數 分數改變 1』改為『變數 分數設為 1』",
+            misconceptionAnalysis: "治標不治本：設為 1 會導致不管吃多少星星分數永遠是 1，完全喪失累積遊戲計分功能。"
+          },
+          {
+            id: "B",
+            isCorrect: false,
+            title: "迷思卡：讓玩家移動變超快",
+            desc: "把玩家移動速度從 10 步改成 500 步，想快速穿過去",
+            misconceptionAnalysis: "破壞遊戲性：速度過快會導致操控失控飛出螢幕，且依然可能在穿過瞬間多重判定。"
+          },
+          {
+            id: "C",
+            isCorrect: true,
+            title: "奧義積木卡：瞬移除錯與分身回收",
+            desc: "加分後立即『隱藏』並重新移到頂部，或直接執行『刪除此分身』",
+            misconceptionAnalysis: "正解！一旦吃到了物品，立刻銷毀或移開該實體，徹底杜絕重複碰撞偵測！"
+          },
+          {
+            id: "D",
+            isCorrect: false,
+            title: "迷思卡：刪除分數變數",
+            desc: "既然加分會出錯，乾脆刪掉變數改用角色說『得分』就好",
+            misconceptionAnalysis: "逃避問題：沒有變數就無法記錄成績與判定通關條件，失去遊戲核心要素。"
+          }
+        ]
+      },
+      {
+        id: 4,
+        title: "第 4 關：幽靈幻影的分身風暴",
+        subheading: "分身應用與遊戲生命週期管理",
+        category: "分身機制 (Clones)",
+        bloom: "Bloom: 綜合與架構",
+        enemyName: "幽靈幻影王",
+        enemyTag: "分身洩漏當機魔",
+        enemySeed: "PhantomClone",
+        enemyColor: "2563eb",
+        enemyTaunt: "「滿天星星掉下來，我生了一萬個分身，讓你的瀏覽器卡到當機！」",
+        bgPrompt: "pixel art retro arcade video game dark sky raining stars galaxy phantom",
+        ticker: "📌 第3節重點：分身三部曲——『建立分身』➔『當分身產生』➔『刪除此分身』！掉到底部必須刪除回收！",
+        question: "製作多顆星星掉落的遊戲時，比起複製 20 個角色，使用『分身』是最佳做法。但如果分身落到舞台底部邊緣時沒有妥善處理，會造成什麼嚴重後果？正確的分身生命週期順序是什麼？",
+        scaffold: {
+          l1: "Scratch 中角色分身上限是 300 個：如果不刪除分身，分身會一直堆積在舞台邊緣佔用記憶體。",
+          l2: "思維破迷：分身落到底部沒被接到的時候，它的任務完成了嗎？此時應該用哪塊積木釋放它？",
+          l3: "名師解法：完整流程為：本體負責『建立自己的分身』；分身啟動於『當分身產生』並往下掉；碰到玩家或落到底部時務必呼叫『刪除此分身』！"
+        },
+        geminiPrompt: "我想了解 Scratch 分身積木的正確回收生命週期。請用一個生動的比喻，引導我思考分身為什麼掉到底部必須被刪除。",
+        cards: [
+          {
+            id: "A",
+            isCorrect: true,
+            title: "奧義積木卡：完滿分身生命之環",
+            desc: "建立分身 ➔ 當分身產生（移至頂端隨機X並下移）➔ 到底部『刪除此分身』",
+            misconceptionAnalysis: "正解！精準管理建立、動作與銷毀，保持舞台順暢不累積無用分身！"
+          },
+          {
+            id: "B",
+            isCorrect: false,
+            title: "迷思卡：手動複製 50 個角色",
+            desc: "在右下角角色區一直按右鍵複製出 50 個獨立星星角色",
+            misconceptionAnalysis: "維護災難：一旦想修改星星移動速度，必須手動改 50 份程式，完全違反模組化程式思維。"
+          },
+          {
+            id: "C",
+            isCorrect: false,
+            title: "迷思卡：只隱藏不刪除",
+            desc: "分身落到底部後只加上『隱藏』積木，不使用『刪除此分身』",
+            misconceptionAnalysis: "內存洩漏陷阱：隱藏的分身依然存在於記憶體中！累積達 300 個上限後，新的分身將無法再產生。"
+          },
+          {
+            id: "D",
+            isCorrect: false,
+            title: "迷思卡：讓本體在舞台上直接跑",
+            desc: "本體隱藏後不需要寫當分身產生，全部寫在綠旗被點擊裡面",
+            misconceptionAnalysis: "概念錯亂：綠旗只會控制本體，分身產生時不會觸發綠旗事件，只會觸發『當分身產生』。"
+          }
+        ]
+      },
+      {
+        id: 5,
+        title: "第 5 關：混沌 Bug 巨龍與 AI 守護者",
+        subheading: "多重條件判斷順序與 AI 素養燈號引導",
+        category: "多重條件 / AI 提問素養",
+        bloom: "Bloom: 綜合創造與數位素養",
+        enemyName: "混沌 Bug 巨龍",
+        enemyTag: "終極混亂魔龍",
+        enemySeed: "ChaosDragon",
+        enemyColor: "dc2626",
+        enemyTaunt: "「你連遇到障礙物跟吃到星星的判斷順序都搞不清楚，還敢問 AI？被我吞噬吧！」",
+        bgPrompt: "pixel art retro arcade video game epic boss dragon cyber matrix matrix codes",
+        ticker: "📌 附件規範：🟢綠燈激發靈感、🟡黃燈查核反思標記、🔴紅燈嚴禁代寫！提問時應請 AI 提出檢查步驟！",
+        question: "在遊戲整合階段，小組要加入『碰到星星加分、碰到障礙物扣血扣命、時間倒數結束宣告勝利』的多重條件，同時遇到 Bug 卡關想要請 AI 協助。依據教案中的【AI 素養燈號規範】與【多重條件邏輯】，下列哪一項行為最符合優秀小小程式設計師的表現？",
+        scaffold: {
+          l1: "回顧教案警示燈：黃燈代表可使用 AI 但必須進行事實查核，紅燈嚴禁直接代寫程式碼。",
+          l2: "思維破迷：什麼樣的提示詞（Prompt）才能保有自己的學習主體性？直接要代碼，跟請 AI 提點測試步驟有何不同？",
+          l3: "名師解法：使用『如果...否則如果...否則...』排出清晰優先順序；向 AI 提問時使用教案範例：『請不要直接給答案，請用三個問題引導我檢查條件順序』！"
+        },
+        geminiPrompt: "請根據中小學 AI 學習指引的綠黃紅燈規範，向五年級學生說明為什麼『請 AI 給出檢查步驟並自己測試』比『直接叫 AI 寫好整段程式碼』更能學會運算思維？",
+        cards: [
+          {
+            id: "A",
+            isCorrect: false,
+            title: "迷思卡：紅燈違規代寫",
+            desc: "直接把整個題目複製給 AI，要求 AI：『幫我把整份 Scratch 檔案寫好直接給我交差』",
+            misconceptionAnalysis: "違反 AI 倫理（🔴紅燈）：損害學術誠信，喪失個人除錯推理機會與學習主體性。"
+          },
+          {
+            id: "B",
+            isCorrect: true,
+            title: "奧義積木卡：黃燈批判思考與巢狀結構",
+            desc: "以巢狀條件嚴謹分流，並向 AI 提問：『請不要直接給答案，請用問題引導我找出條件順序錯誤』",
+            misconceptionAnalysis: "正解（🟡黃燈典範）！既維持了清晰的多重條件結構，又主動掌控學習節奏與除錯查核！"
+          },
+          {
+            id: "C",
+            isCorrect: false,
+            title: "迷思卡：多重條件全部分開寫",
+            desc: "連續寫四個獨立的『如果』，完全不考慮條件互斥與先後順序",
+            misconceptionAnalysis: "邏輯缺陷：缺乏否則（Else）保護，可能在同一個迴圈週期內同時觸發加分又扣命的衝突狀態。"
+          },
+          {
+            id: "D",
+            isCorrect: false,
+            title: "迷思卡：全面拒絕科技輔助",
+            desc: "堅持連電腦的報錯訊息都不看，卡關三節課也不與同學或 AI 討論",
+            misconceptionAnalysis: "過度封閉：數位學習指引鼓勵在🟢綠燈與🟡黃燈範圍內善用科技資源激發思考與同儕協作。"
+          }
+        ]
+      }
+    ];
+
+    /* ========================================================
+       3. 遊戲主控制器 (GameController)
+       ======================================================== */
+    class GameController {
+      constructor() {
+        this.sound = new RetroSoundEngine();
+        this.currentStageIdx = 0;
+        this.playerHp = 100;
+        this.enemyHp = 100;
+        this.combo = 0;
+        this.maxCombo = 0;
+        this.startTime = Date.now();
+        this.userAnswersLog = []; // 供 CSV 匯出與雷達圖計算
+
+        // 五向度素養評分 (0 ~ 100)
+        this.competencyScores = {
+          loop: 75,       // 迴圈邏輯
+          condition: 75,  // 條件偵測
+          cloning: 75,    // 分身整合
+          debugging: 75,  // 除錯推理
+          aiLiteracy: 75  // AI 素養
+        };
+
+        this.initDOMElements();
+        this.bindEvents();
+        this.loadStage(0);
+      }
+
+      initDOMElements() {
+        this.el = {
+          stageBadge: document.getElementById('stage-badge'),
+          stageSubheading: document.getElementById('stage-subheading'),
+          tickerText: document.getElementById('ticker-text'),
+          playerHpText: document.getElementById('player-hp-text'),
+          playerHpBar: document.getElementById('player-hp-bar'),
+          comboCount: document.getElementById('combo-count'),
+          enemyName: document.getElementById('enemy-name'),
+          enemyTag: document.getElementById('enemy-tag'),
+          enemyHpText: document.getElementById('enemy-hp-text'),
+          enemyHpBar: document.getElementById('enemy-hp-bar'),
+          enemyBubble: document.getElementById('enemy-bubble'),
+          playerBubble: document.getElementById('player-bubble'),
+          enemyAvatar: document.getElementById('enemy-avatar'),
+          stageBgImg: document.getElementById('stage-bg-img'),
+          battleStage: document.getElementById('battle-stage'),
+          floatingContainer: document.getElementById('floating-container'),
+
+          questionCategory: document.getElementById('question-category'),
+          bloomLevel: document.getElementById('bloom-level'),
+          questionText: document.getElementById('question-text'),
+          cardsContainer: document.getElementById('cards-container'),
+
+          // Modals
+          scaffoldModal: document.getElementById('scaffold-modal'),
+          scaffoldL1: document.getElementById('scaffold-l1'),
+          scaffoldL2: document.getElementById('scaffold-l2'),
+          scaffoldL3: document.getElementById('scaffold-l3'),
+
+          geminiModal: document.getElementById('gemini-modal'),
+          geminiResponseBox: document.getElementById('gemini-response-box'),
+
+          settingsModal: document.getElementById('settings-modal'),
+          inputApiKey: document.getElementById('input-api-key'),
+
+          victoryModal: document.getElementById('victory-modal'),
+          radarCanvas: document.getElementById('radar-canvas'),
+          statTotalTime: document.getElementById('stat-total-time'),
+          statMaxCombo: document.getElementById('stat-max-combo'),
+          evalSummary: document.getElementById('eval-summary'),
+
+          toast: document.getElementById('toast'),
+          toastMsg: document.getElementById('toast-msg'),
+          toastIcon: document.getElementById('toast-icon')
+        };
+      }
+
+      bindEvents() {
+        // 音效切換
+        document.getElementById('btn-sound-toggle').addEventListener('click', (e) => {
+          const isMuted = this.sound.toggleMute();
+          e.currentTarget.textContent = isMuted ? '🔇' : '🔊';
+          this.showToast(isMuted ? '音效已靜音' : '音效已開啟', '🎵');
+        });
+
+        // 鷹架彈窗
+        document.getElementById('btn-open-scaffold').addEventListener('click', () => {
+          this.sound.playClick();
+          this.openScaffoldModal();
+        });
+        document.getElementById('btn-close-scaffold').addEventListener('click', () => {
+          this.el.scaffoldModal.classList.add('hidden');
+        });
+        document.getElementById('btn-ack-scaffold').addEventListener('click', () => {
+          this.el.scaffoldModal.classList.add('hidden');
+        });
+
+        // Gemini AI 提點彈窗
+        document.getElementById('btn-ask-gemini').addEventListener('click', () => {
+          this.sound.playClick();
+          this.openGeminiModal();
+        });
+        document.getElementById('btn-close-gemini').addEventListener('click', () => {
+          this.el.geminiModal.classList.add('hidden');
+        });
+        document.getElementById('btn-request-gemini-ai').addEventListener('click', () => {
+          this.requestGeminiSocrates();
+        });
+
+        // 設定彈窗
+        document.getElementById('btn-api-modal').addEventListener('click', () => {
+          this.sound.playClick();
+          this.el.inputApiKey.value = localStorage.getItem('gemini_user_api_key') || '';
+          this.el.settingsModal.classList.remove('hidden');
+        });
+        document.getElementById('btn-close-settings').addEventListener('click', () => {
+          this.el.settingsModal.classList.add('hidden');
+        });
+        document.getElementById('btn-save-key').addEventListener('click', () => {
+          const key = this.el.inputApiKey.value.trim();
+          localStorage.setItem('gemini_user_api_key', key);
+          this.el.settingsModal.classList.add('hidden');
+          this.showToast('API Key 已儲存至瀏覽器！', '🔑');
+        });
+
+        // 通關後動作
+        document.getElementById('btn-export-csv').addEventListener('click', () => {
+          this.exportCSV();
+        });
+        document.getElementById('btn-copy-report').addEventListener('click', () => {
+          this.copyReportText();
+        });
+        document.getElementById('btn-restart-game').addEventListener('click', () => {
+          this.restartGame();
+        });
+      }
+
+      loadStage(idx) {
+        if (idx >= STAGES_DATA.length) {
+          this.triggerVictory();
+          return;
+        }
+
+        this.currentStageIdx = idx;
+        const data = STAGES_DATA[idx];
+        this.enemyHp = 100;
+        this.updateEnemyHpUI();
+
+        // 介面資料填入
+        this.el.stageBadge.textContent = `第 ${data.id} / ${STAGES_DATA.length} 關`;
+        this.el.stageSubheading.textContent = `${data.title}：${data.subheading}`;
+        this.el.tickerText.textContent = data.ticker;
+        this.el.questionCategory.textContent = `[${data.category}]`;
+        this.el.bloomLevel.textContent = data.bloom;
+        this.el.questionText.textContent = data.question;
+
+        // 怪物視覺更新
+        this.el.enemyName.textContent = data.enemyName;
+        this.el.enemyTag.textContent = data.enemyTag;
+        this.el.enemyBubble.textContent = data.enemyTaunt;
+        this.el.enemyAvatar.src = `https://api.dicebear.com/9.x/pixel-art/svg?seed=${data.enemySeed}&backgroundColor=${data.enemyColor}`;
+        this.el.stageBgImg.src = `https://image.pollinations.ai/prompt/${encodeURIComponent(data.bgPrompt)}?width=1024&height=600&nologo=true`;
+
+        // 洗牌卡牌 (Fisher-Yates)
+        const shuffledCards = [...data.cards];
+        for (let i = shuffledCards.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [shuffledCards[i], shuffledCards[j]] = [shuffledCards[j], shuffledCards[i]];
+        }
+
+        // 渲染卡牌
+        this.el.cardsContainer.innerHTML = '';
+        shuffledCards.forEach(card => {
+          const btn = document.createElement('button');
+          btn.className = 'pixel-card text-left p-3.5 rounded-xl bg-slate-800/90 hover:bg-slate-750 flex flex-col justify-between gap-1.5 focus:outline-none';
+          btn.innerHTML = `
+            <div class="flex items-center justify-between w-full">
+              <span class="font-bold text-sm text-amber-300 flex items-center gap-1.5">
+                <span class="text-xs bg-slate-700 text-slate-200 px-1.5 py-0.5 rounded font-mono">${card.id}</span>
+                <span>${card.title}</span>
+              </span>
+              <span class="text-[10px] text-slate-400">點擊施放積木</span>
+            </div>
+            <p class="text-xs text-slate-300 leading-relaxed font-normal">${card.desc}</p>
+          `;
+          btn.onclick = () => this.handleCardSelect(card, btn);
+          this.el.cardsContainer.appendChild(btn);
+        });
+      }
+
+      handleCardSelect(card, btnElement) {
+        this.sound.init();
+        const stage = STAGES_DATA[this.currentStageIdx];
+        const isCorrect = card.isCorrect;
+
+        // 紀錄作答歷程
+        this.userAnswersLog.push({
+          stageId: stage.id,
+          stageName: stage.title,
+          category: stage.category,
+          selectedCard: card.title,
+          isCorrect: isCorrect,
+          timestamp: new Date().toLocaleTimeString(),
+          timeSpentSec: Math.round((Date.now() - this.startTime) / 1000)
+        });
+
+        if (isCorrect) {
+          // ===== 答對反饋 =====
+          this.sound.playSuccess();
+          this.combo++;
+          if (this.combo > this.maxCombo) this.maxCombo = this.combo;
+          this.el.comboCount.textContent = `${this.combo}x`;
+          this.el.comboCount.classList.add('text-amber-300', 'scale-125');
+          setTimeout(() => this.el.comboCount.classList.remove('scale-125'), 200);
+
+          // 視覺特效：怪物扣血 & 浮動暴擊
+          this.enemyHp = 0;
+          this.updateEnemyHpUI();
+          this.spawnFloatingText(`💥 CRITICAL HIT! 破解迷思 -100 HP`, 'text-amber-400 font-extrabold text-lg');
+          this.el.playerBubble.textContent = `奧義發動！「${card.title}」成功擊潰 Bug！`;
+          this.el.playerBubble.classList.remove('hidden');
+
+          // 素養增長
+          this.adjustCompetency(stage.id, true);
+
+          // 鎖定卡牌避免重複點擊
+          const allCards = this.el.cardsContainer.querySelectorAll('button');
+          allCards.forEach(b => b.disabled = true);
+          btnElement.classList.add('ring-4', 'ring-emerald-500', 'bg-emerald-950/60');
+
+          this.showToast(`答對了！${card.misconceptionAnalysis}`, '🎉');
+
+          setTimeout(() => {
+            this.el.playerBubble.classList.add('hidden');
+            this.loadStage(this.currentStageIdx + 1);
+          }, 1600);
+
+        } else {
+          // ===== 答錯反饋（符合教案鷹架不強制扣死，提供提示） =====
+          this.sound.playHurt();
+          this.combo = 0;
+          this.el.comboCount.textContent = '0x';
+
+          // 震動畫面
+          this.el.battleStage.classList.add('shake');
+          setTimeout(() => this.el.battleStage.classList.remove('shake'), 400);
+
+          // 玩家微扣血但保留最低生命
+          this.playerHp = Math.max(25, this.playerHp - 15);
+          this.updatePlayerHpUI();
+
+          this.spawnFloatingText(`⚠️ 觸發迷思陷阱！`, 'text-rose-400 font-bold text-base');
+          this.el.enemyBubble.textContent = `「哈哈！${card.misconceptionAnalysis}」`;
+
+          // 降低該向度評分
+          this.adjustCompetency(stage.id, false);
+
+          btnElement.classList.add('ring-2', 'ring-rose-500', 'bg-rose-950/40', 'opacity-60');
+          btnElement.disabled = true;
+
+          // 彈出鷹架提示
+          this.showToast(`觸發迷思！已為您解鎖三階鷹架！`, '💡');
+          setTimeout(() => {
+            this.openScaffoldModal();
+          }, 700);
+        }
+      }
+
+      adjustCompetency(stageId, isCorrect) {
+        const delta = isCorrect ? 5 : -5;
+        if (stageId === 1) this.competencyScores.loop = Math.min(100, Math.max(40, this.competencyScores.loop + delta));
+        if (stageId === 2) this.competencyScores.condition = Math.min(100, Math.max(40, this.competencyScores.condition + delta));
+        if (stageId === 3) this.competencyScores.debugging = Math.min(100, Math.max(40, this.competencyScores.debugging + delta));
+        if (stageId === 4) this.competencyScores.cloning = Math.min(100, Math.max(40, this.competencyScores.cloning + delta));
+        if (stageId === 5) this.competencyScores.aiLiteracy = Math.min(100, Math.max(40, this.competencyScores.aiLiteracy + delta));
+      }
+
+      spawnFloatingText(text, extraClass) {
+        const span = document.createElement('div');
+        span.className = `floating-text absolute ${extraClass} pointer-events-none drop-shadow-md text-center px-4 py-1 rounded-full bg-slate-900/80 border border-slate-700`;
+        span.textContent = text;
+        this.el.floatingContainer.appendChild(span);
+        setTimeout(() => span.remove(), 900);
+      }
+
+      updatePlayerHpUI() {
+        this.el.playerHpText.textContent = `${this.playerHp}/100`;
+        this.el.playerHpBar.style.width = `${this.playerHp}%`;
+        if (this.playerHp < 40) {
+          this.el.playerHpBar.classList.remove('bg-emerald-500');
+          this.el.playerHpBar.classList.add('bg-rose-500');
+        } else {
+          this.el.playerHpBar.classList.remove('bg-rose-500');
+          this.el.playerHpBar.classList.add('bg-emerald-500');
+        }
+      }
+
+      updateEnemyHpUI() {
+        this.el.enemyHpText.textContent = `${this.enemyHp}%`;
+        this.el.enemyHpBar.style.width = `${this.enemyHp}%`;
+      }
+
+      openScaffoldModal() {
+        const stage = STAGES_DATA[this.currentStageIdx];
+        this.el.scaffoldL1.textContent = stage.scaffold.l1;
+        this.el.scaffoldL2.textContent = stage.scaffold.l2;
+        this.el.scaffoldL3.textContent = stage.scaffold.l3;
+        this.el.scaffoldModal.classList.remove('hidden');
+      }
+
+      openGeminiModal() {
+        const stage = STAGES_DATA[this.currentStageIdx];
+        this.el.geminiResponseBox.innerHTML = `
+          <div class="space-y-2">
+            <div class="text-amber-300 font-bold">🎯 正在為您連線【第 ${stage.id} 關：${stage.title}】的專屬導師...</div>
+            <p class="text-slate-400">教案關鍵引導句：『請不要直接給答案，請用三個問題引導我找出Scratch條件判斷的錯誤』</p>
+          </div>
+        `;
+        this.el.geminiModal.classList.remove('hidden');
+      }
+
+      async requestGeminiSocrates() {
+        const stage = STAGES_DATA[this.currentStageIdx];
+        const apiKey = localStorage.getItem('gemini_user_api_key');
+        this.el.geminiResponseBox.innerHTML = `
+          <div class="flex items-center justify-center gap-2 text-purple-300 py-6">
+            <div class="w-4 h-4 border-2 border-purple-400 border-t-transparent rounded-full animate-spin"></div>
+            <span>蘇格拉底 AI 導師正在構思引導式提問...</span>
+          </div>
+        `;
+
+        if (!apiKey) {
+          // 離線降級 (Graceful Degradation) 預載名師蘇格拉底解析
+          setTimeout(() => {
+            this.el.geminiResponseBox.innerHTML = `
+              <div class="space-y-3">
+                <div class="bg-purple-950/60 p-3 rounded-lg border border-purple-800 text-purple-200">
+                  <div class="font-black mb-1 flex items-center gap-1">
+                    <span>💡</span> <span>導師提點（離線優化模式）：</span>
+                  </div>
+                  <ol class="list-decimal list-inside space-y-1.5 text-slate-300 text-xs">
+                    <li>請觀察程式啟動的瞬間，這行積木是在哪一個時間點被執行的？是一次還是隨時？</li>
+                    <li>如果想讓角色的動作就像時鐘一樣不停輪轉，外面需要什麼樣的積木外框？</li>
+                    <li>若碰到邊緣卻沒有寫『反彈』指令，角色會停在螢幕哪裡？請親自在 Scratch 裡實測看看！</li>
+                  </ol>
+                </div>
+                <div class="text-[10px] text-slate-500 text-right">※ 提示：輸入 API Key 可解鎖全自由對話</div>
+              </div>
+            `;
+          }, 600);
+          return;
+        }
+
+        // 調用真實 Gemini 2.5 Flash API
+        try {
+          const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+          const systemPrompt = "你是臺灣國小五年級資訊科技專屬的親切導師。你深諳 Scratch 3.0 與運算思維。遵循 108 課綱與黃燈查核準則：絕對不要直接給出答案或直接給出代碼，務必以蘇格拉底反詰法提出三個具有啟發性的問題，引導學生思考電腦執行順序、迴圈或碰撞消除。字數精簡，在180字以內。使用繁體中文。";
+          const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ role: 'user', parts: [{ text: `${systemPrompt}\n\n學生現在遭遇的情境是：${stage.geminiPrompt}` }] }]
+            })
+          });
+
+          if (!res.ok) throw new Error(`API 回傳錯誤碼: ${res.status}`);
+          const data = await res.json();
+          const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "導師正在思考中，請稍候重試。";
+
+          this.el.geminiResponseBox.innerHTML = `
+            <div class="bg-purple-950/60 p-3 rounded-lg border border-purple-800 text-purple-200 whitespace-pre-wrap leading-relaxed text-xs">
+              ${reply}
+            </div>
+          `;
+        } catch (err) {
+          // 網路失敗自動降級
+          this.el.geminiResponseBox.innerHTML = `
+            <div class="bg-amber-950/60 p-3 rounded-lg border border-amber-800 text-amber-200 text-xs">
+              ⚠️ 連線至 Gemini API 遭遇阻礙（${err.message}），已自動啟用離線導師庫：<br><br>
+              <strong>名師核心提問：</strong><br>
+              1. 電腦在執行積木時，是從上到下一步步執行的，這段程式有沒有被重複啟動？<br>
+              2. 接到星星後，如果星星沒有立即隱藏，電腦每秒檢查 30 次會發生什麼事？
+            </div>
+          `;
+        }
+      }
+
+      triggerVictory() {
+        this.sound.playFanfare();
+        const totalSec = Math.round((Date.now() - this.startTime) / 1000);
+        const mins = String(Math.floor(totalSec / 60)).padStart(2, '0');
+        const secs = String(totalSec % 60).padStart(2, '0');
+
+        this.el.statTotalTime.textContent = `${mins}:${secs}`;
+        this.el.statMaxCombo.textContent = `${this.maxCombo}x`;
+        this.el.victoryModal.classList.remove('hidden');
+
+        // 繪製原生 HTML5 Canvas 雷達圖
+        this.drawRadarChart();
+      }
+
+      drawRadarChart() {
+        const canvas = this.el.radarCanvas;
+        const ctx = canvas.getContext('2d');
+        const w = canvas.width;
+        const h = canvas.height;
+        const cx = w / 2;
+        const cy = h / 2;
+        const radius = 80;
+
+        ctx.clearRect(0, 0, w, h);
+
+        const dimensions = [
+          { name: '迴圈邏輯', score: this.competencyScores.loop },
+          { name: '條件偵測', score: this.competencyScores.condition },
+          { name: '除錯推理', score: this.competencyScores.debugging },
+          { name: '分身整合', score: this.competencyScores.cloning },
+          { name: 'AI素養', score: this.competencyScores.aiLiteracy }
+        ];
+
+        const totalSides = dimensions.length;
+        const angleStep = (Math.PI * 2) / totalSides;
+
+        // 繪製背景多邊形網格
+        const levels = [0.25, 0.5, 0.75, 1.0];
+        ctx.strokeStyle = '#334155';
+        ctx.lineWidth = 1;
+
+        levels.forEach(lvl => {
+          ctx.beginPath();
+          for (let i = 0; i < totalSides; i++) {
+            const angle = i * angleStep - Math.PI / 2;
+            const x = cx + Math.cos(angle) * (radius * lvl);
+            const y = cy + Math.sin(angle) * (radius * lvl);
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+          }
+          ctx.closePath();
+          ctx.stroke();
+        });
+
+        // 繪製軸線與標籤
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '10px "Noto Sans TC", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        dimensions.forEach((dim, i) => {
+          const angle = i * angleStep - Math.PI / 2;
+          const x = cx + Math.cos(angle) * radius;
+          const y = cy + Math.sin(angle) * radius;
+
+          // 軸線
+          ctx.beginPath();
+          ctx.moveTo(cx, cy);
+          ctx.lineTo(x, y);
+          ctx.strokeStyle = '#1e293b';
+          ctx.stroke();
+
+          // 標籤文字
+          const lx = cx + Math.cos(angle) * (radius + 24);
+          const ly = cy + Math.sin(angle) * (radius + 18);
+          ctx.fillText(dim.name, lx, ly);
+        });
+
+        // 繪製學生數據多邊形
+        ctx.beginPath();
+        dimensions.forEach((dim, i) => {
+          const angle = i * angleStep - Math.PI / 2;
+          const r = radius * (dim.score / 100);
+          const x = cx + Math.cos(angle) * r;
+          const y = cy + Math.sin(angle) * r;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(14, 165, 233, 0.45)'; // Sky blue semi-transparent
+        ctx.fill();
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+
+        // 繪製節點圓點
+        dimensions.forEach((dim, i) => {
+          const angle = i * angleStep - Math.PI / 2;
+          const r = radius * (dim.score / 100);
+          const x = cx + Math.cos(angle) * r;
+          const y = cy + Math.sin(angle) * r;
+          ctx.beginPath();
+          ctx.arc(x, y, 4, 0, Math.PI * 2);
+          ctx.fillStyle = '#f59e0b'; // Amber
+          ctx.fill();
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        });
+      }
+
+      exportCSV() {
+        if (this.userAnswersLog.length === 0) {
+          this.showToast('尚無作答紀錄可匯出', '⚠️');
+          return;
+        }
+
+        // 加入 UTF-8 BOM (\uFEFF) 防止 Excel 開啟中文亂碼
+        let csvContent = '\uFEFF關卡編號,關卡名稱,評量領域,選擇卡牌,是否正解,作答時間戳,作答耗時(秒)\n';
+        this.userAnswersLog.forEach(row => {
+          const cleanName = `"${row.stageName.replace(/"/g, '""')}"`;
+          const cleanCard = `"${row.selectedCard.replace(/"/g, '""')}"`;
+          csvContent += `${row.stageId},${cleanName},${row.category},${cleanCard},${row.isCorrect ? '正確' : '需引導'},${row.timestamp},${row.timeSpentSec}\n`;
+        });
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', `五年級Scratch_接星大冒險歷程_${Date.now()}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        this.showToast('學習歷程 CSV 下載完成！', '📥');
+      }
+
+      async copyReportText() {
+        const report = `【五年級 Scratch 小小遊戲設計師：程式勇者通關回報】
+--------------------------------------------------
+👤 挑戰者：程式勇者（五年級）
+⏱️ 總耗時：${this.el.statTotalTime.textContent}
+🔥 最高連擊 (Combo)：${this.maxCombo}x
+🛡️ 最終生命值：${this.playerHp}/100
+
+📊 108 課綱五向度運算思維達成指標：
+  • 迴圈巡邏邏輯：${this.competencyScores.loop} 分
+  • 條件碰撞偵測：${this.competencyScores.condition} 分
+  • 變數除錯推理：${this.competencyScores.debugging} 分
+  • 分身架構整合：${this.competencyScores.cloning} 分
+  • AI 素養與反思：${this.competencyScores.aiLiteracy} 分
+
+🌟 教學亮點：已能熟練掌握「重複執行」常駐偵測，並成功排除「碰撞重複爆分」Bug，展現優秀的 Scratch 遊戲整合能力！`;
+
+        try {
+          await navigator.clipboard.writeText(report);
+          this.showToast('成果簡報已成功複製至剪貼簿！', '📋');
+        } catch (err) {
+          this.showToast('剪貼簿複製失敗，請手動選取', '⚠️');
+        }
+      }
+
+      restartGame() {
+        this.el.victoryModal.classList.add('hidden');
+        this.playerHp = 100;
+        this.combo = 0;
+        this.maxCombo = 0;
+        this.userAnswersLog = [];
+        this.startTime = Date.now();
+        this.updatePlayerHpUI();
+        this.el.comboCount.textContent = '0x';
+        this.loadStage(0);
+        this.showToast('重新啟動冒險！', '🎮');
+      }
+
+      showToast(msg, icon = '✨') {
+        this.el.toastIcon.textContent = icon;
+        this.el.toastMsg.textContent = msg;
+        this.el.toast.classList.remove('translate-y-24', 'opacity-0');
+        this.el.toast.classList.add('translate-y-0', 'opacity-100');
+        clearTimeout(this.toastTimer);
+        this.toastTimer = setTimeout(() => {
+          this.el.toast.classList.remove('translate-y-0', 'opacity-100');
+          this.el.toast.classList.add('translate-y-24', 'opacity-0');
+        }, 3000);
+      }
+    }
+
+    // 啟動遊戲實例
+    window.onload = () => {
+      window.game = new GameController();
+    };
+  </script>
+</body>
+</html>
